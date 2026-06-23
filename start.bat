@@ -3,18 +3,18 @@ chcp 65001 >nul
 REM furniture_cutout 启动脚本
 
 if not exist .venv (
-    echo [错误] 未找到虚拟环境。请先运行 install.bat 完成安装。
-    pause
+    echo 请先运行 install.bat 完成安装
     exit /b 1
 )
 
 call .venv\Scripts\activate.bat
-
 if errorlevel 1 (
-    echo [错误] 激活虚拟环境失败。
-    pause
+    echo 请先运行 install.bat 完成安装
     exit /b 1
 )
+
+REM 确保下载有进度显示（可选）
+set HF_HUB_DISABLE_PROGRESS_BARS=0
 
 python app.py
 if errorlevel 1 (
