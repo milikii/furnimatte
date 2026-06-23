@@ -28,6 +28,7 @@ class ImageView(QWidget):
         self._drag_start: QPoint = QPoint(0, 0)
         self._image_size: tuple[int, int] = (0, 0)  # original image (w, h)
         self._bg_image: QImage | None = None        # cached background for current size
+        self._overlay_rect = None                    # optional overlay rect (reserved)
         self.setMinimumSize(100, 100)
         self.setMouseTracking(False)
 
@@ -64,6 +65,24 @@ class ImageView(QWidget):
         self._rebuild_bg()
         self.update()
 
+    def clear(self) -> None:
+        """Clear the displayed image and reset view state."""
+        self._image = None
+        self._image_size = (0, 0)
+        self._bg_image = None
+        self._scale = 1.0
+        self._offset = QPoint(0, 0)
+        self.update()
+
+    def set_overlay_rect(self, rect) -> None:
+        """Set an overlay rectangle to draw, or None to clear.
+
+        Currently a no-op placeholder (BoxSelector uses QRubberBand),
+        reserved for a future paintEvent-based overlay if needed.
+        """
+        self._overlay_rect = rect
+        self.update()
+
     def view_to_image(self, pos: QPoint) -> QPoint:
         """Convert viewport coordinates to original image coordinates.
 
@@ -74,6 +93,11 @@ class ImageView(QWidget):
         x = round((pos.x() - self._offset.x()) / self._scale)
         y = round((pos.y() - self._offset.y()) / self._scale)
         return QPoint(x, y)
+
+    @property
+    def image_size(self) -> tuple[int, int]:
+        """Original image size (w, h)."""
+        return self._image_size
 
     # ---- Internal helpers --------------------------------------------------
 
