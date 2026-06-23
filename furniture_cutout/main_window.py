@@ -17,7 +17,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from furniture_cutout import exporter, image_processing as ip, logging_config, settings as settings_mod
+from furniture_cutout import exporter
+from furniture_cutout import image_processing as ip
+from furniture_cutout import logging_config
+from furniture_cutout import settings as settings_mod
 from furniture_cutout.box_selector import BoxSelector
 from furniture_cutout.image_view import ImageView
 from furniture_cutout.inference_worker import InferenceWorker
@@ -162,7 +165,9 @@ class MainWindow(QMainWindow):
         self._left_view.set_original(self.preview)
 
         sw, sh = self._left_view.image_size
-        self._status.showMessage(f"已打开：{os.path.basename(path)}  ({meta['width']}×{meta['height']})")
+        self._status.showMessage(
+            f"已打开：{os.path.basename(path)}  ({meta['width']}×{meta['height']})"
+        )
 
         self._act_cutout.setEnabled(True)
         self._act_box.setEnabled(False)
@@ -205,7 +210,9 @@ class MainWindow(QMainWindow):
         self.selected_box = (x, y, w, h)
         # Small box protection
         if w < 50 or h < 50:
-            QMessageBox.warning(self, "框选区域太小", "框选区域太小（<50像素），请重新框选家具主体。")
+            QMessageBox.warning(
+                self, "框选区域太小", "框选区域太小（<50像素），请重新框选家具主体。"
+            )
             self.cancel_box()
             return
 
@@ -296,7 +303,7 @@ class MainWindow(QMainWindow):
         self._act_box.setEnabled(True)
         out_size = self.current_rgba.size if self.current_rgba else (0, 0)
         self._status.showMessage(
-            f"{'整图抠图' if mode=='full' else '框选重算'}完成  "
+            f"{'整图抠图' if mode == 'full' else '框选重算'}完成  "
             f"输出 {out_size[0]}×{out_size[1]}  耗时 {elapsed:.1f}s"
         )
 
@@ -316,7 +323,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 title,
-                f"无法下载模型。请检查网络、代理，\n或在设置中开启 HF 镜像、\n或手动选择本地模型目录。\n\n{message}",
+                (
+                    "无法下载模型。请检查网络、代理，\n"
+                    "或在设置中开启 HF 镜像、\n"
+                    f"或手动选择本地模型目录。\n\n{message}",
+                ),
             )
         else:
             QMessageBox.critical(self, title, f"{message}\n\n详情见 logs/app.log")

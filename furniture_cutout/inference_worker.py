@@ -69,7 +69,9 @@ class InferenceWorker(QThread):
         except EngineError as e:
             self.failed.emit(e.kind, e.message, traceback.format_exc())
         except MemoryError:
-            self.failed.emit("oom", "内存不足，请尝试较小图片或关闭其他程序。", tb_format)
+            self.failed.emit(
+                "oom", "内存不足，请尝试较小图片或关闭其他程序。", traceback.format_exc()
+            )
         except Exception as e:
             self.failed.emit("inference", f"推理失败：{str(e)}", traceback.format_exc())
 
@@ -93,12 +95,14 @@ class InferenceWorker(QThread):
         alpha = self._engine.infer(rgb_pil)
         rgba = ip.compose_rgba(rgb_pil, alpha)
         elapsed = time.time() - t0
-        self.finished.emit({
-            "rgba": rgba,
-            "alpha": alpha,
-            "elapsed": elapsed,
-            "mode": "full",
-        })
+        self.finished.emit(
+            {
+                "rgba": rgba,
+                "alpha": alpha,
+                "elapsed": elapsed,
+                "mode": "full",
+            }
+        )
 
     def _do_infer_box(self, rgb_pil, box):
         self._ensure_loaded()
@@ -120,12 +124,14 @@ class InferenceWorker(QThread):
         # Zero out area outside the expanded box (already done by map_roi_alpha_to_full)
         rgba = ip.compose_rgba(rgb_pil, full_alpha)
         elapsed = time.time() - t0
-        self.finished.emit({
-            "rgba": rgba,
-            "alpha": full_alpha,
-            "elapsed": elapsed,
-            "mode": "box",
-        })
+        self.finished.emit(
+            {
+                "rgba": rgba,
+                "alpha": full_alpha,
+                "elapsed": elapsed,
+                "mode": "box",
+            }
+        )
 
     def _ensure_loaded(self):
         """Lazy-load model if not already loaded."""
