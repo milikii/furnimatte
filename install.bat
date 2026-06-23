@@ -3,89 +3,93 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 
 echo ========================================
-echo  Furniture Cutout — 安装依赖
+echo  Furniture Cutout - Install Dependencies
 echo ========================================
 echo.
 
 REM ---- 检查 Python ----
 where python >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 未检测到 python 命令。
-    echo 请安装 Python 3.11 64-bit，并勾选 "Add Python to PATH"。
-    echo 下载: https://www.python.org/downloads/release/python-3119/
-    goto :error
-)
+if errorlevel 1 goto :no_python
 
 for /f "tokens=*" %%v in ('python --version 2^>^&1') do set PYVER=%%v
-echo 检测到: !PYVER!
+echo Detected: !PYVER!
 
-echo !PYVER! | findstr /R "3\.11" >nul
-if errorlevel 1 (
-    echo [错误] 需要 Python 3.11，当前为 !PYVER!。
-    echo 请安装 Python 3.11 64-bit。
-    goto :error
-)
+echo !PYVER! | findstr /R "3\.11 3\.12" >nul
+if errorlevel 1 goto :wrong_version
 
 python -c "import platform; assert platform.architecture()[0]=='64bit'" >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 需要 64-bit Python，当前为 32-bit。
-    echo 请卸载后安装 Python 3.11 64-bit。
-    goto :error
-)
+if errorlevel 1 goto :wrong_arch
 
-echo [通过] Python 3.11 64-bit
+echo [OK] Python 3.11/3.12 64-bit
 echo.
+
+:no_python
+echo [ERROR] python not found in PATH.
+echo Install Python 3.11 64-bit and check "Add Python to PATH".
+echo https://www.python.org/downloads/release/python-3119/
+goto :error
+
+:wrong_version
+echo [ERROR] Need Python 3.11 or 3.12, got !PYVER!.
+echo torch 2.3.1 has no wheel for this version.
+echo Install Python 3.11 64-bit:
+echo https://www.python.org/downloads/release/python-3119/
+goto :error
+
+:wrong_arch
+echo [ERROR] Need 64-bit Python, current is 32-bit.
+goto :error
 
 REM ---- 创建虚拟环境 ----
 if exist .venv\ (
-    echo [跳过] .venv 已存在
+    echo [SKIP] .venv already exists
 ) else (
-    echo [步骤] 创建虚拟环境 .venv ...
+    echo [STEP] Creating venv .venv ...
     python -m venv .venv
     if errorlevel 1 (
-        echo [错误] 创建虚拟环境失败
+        echo [ERROR] venv creation failed
         goto :error
     )
-    echo [完成] 虚拟环境创建成功
+    echo [DONE] venv created
 )
 echo.
 
 REM ---- 激活虚拟环境 ----
 call .venv\Scripts\activate.bat
 if errorlevel 1 (
-    echo [错误] 激活虚拟环境失败
+    echo [ERROR] venv activation failed
     goto :error
 )
 
-echo [步骤] 升级 pip ...
+echo [STEP] Upgrading pip ...
 python -m pip install --upgrade pip
 if errorlevel 1 (
-    echo [警告] pip 升级失败，继续安装 ...
+    echo [WARN] pip upgrade failed, continuing ...
 )
 echo.
 
 REM ---- 安装 CPU 版 PyTorch（不装 CUDA）----
-echo [步骤] 安装 PyTorch 2.3.1 CPU 版 ...
-echo （约 200MB，请耐心等待）
+echo [STEP] Installing PyTorch 2.3.1 CPU ...
+echo (~200MB, please wait)
 pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
 if errorlevel 1 (
-    echo [错误] PyTorch 安装失败
-    echo 可能是网络问题，可尝试配置镜像或代理后重试。
+    echo [ERROR] PyTorch install failed
+    echo Network issue? Try a mirror or proxy.
     goto :error
 )
 echo.
 
 REM ---- 安装其余依赖 ----
-echo [步骤] 安装 requirements.txt ...
+echo [STEP] Installing requirements.txt ...
 pip install -r requirements.txt
 if errorlevel 1 (
-    echo [错误] 依赖安装失败，请检查 requirements.txt
+    echo [ERROR] requirements install failed
     goto :error
 )
 echo.
 
 echo ========================================
-echo  安装完成！运行 start.bat 启动程序
+echo  Done. Run start.bat to launch.
 echo ========================================
 echo.
 pause
@@ -94,7 +98,7 @@ exit /b 0
 :error
 echo.
 echo ========================================
-echo  安装失败，请查看上方错误信息
+echo  Install failed. See error above.
 echo ========================================
 echo.
 pause
