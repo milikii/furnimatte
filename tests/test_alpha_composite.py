@@ -1,7 +1,6 @@
 """Tests for RGBA composite correctness: straight alpha, transparent region, semi-transparent."""
 
 import numpy as np
-import pytest
 from PIL import Image
 
 from furniture_cutout import image_processing as ip

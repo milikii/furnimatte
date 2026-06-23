@@ -68,7 +68,7 @@ class InferenceWorker(QThread):
                 self._do_infer_box(task["rgb"], task["box"])
         except EngineError as e:
             self.failed.emit(e.kind, e.message, traceback.format_exc())
-        except MemoryError as e:
+        except MemoryError:
             self.failed.emit("oom", "内存不足，请尝试较小图片或关闭其他程序。", traceback.format_exc())
         except Exception as e:
             self.failed.emit("inference", f"推理失败：{str(e)}", traceback.format_exc())

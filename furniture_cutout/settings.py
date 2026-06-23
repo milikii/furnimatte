@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field  # noqa: F401
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,

@@ -1,7 +1,5 @@
 """BiRefNet engine smoke test (skipped without FURNIMATTE_MODEL=1)."""
 
-import os
-
 import numpy as np
 import pytest
 from PIL import Image

@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import os
-import time
-import traceback
 
 from PIL import Image as PILImage
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -17,7 +14,6 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QStatusBar,
     QToolBar,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -25,7 +21,7 @@ from furniture_cutout import exporter, image_processing as ip, logging_config, s
 from furniture_cutout.box_selector import BoxSelector
 from furniture_cutout.image_view import ImageView
 from furniture_cutout.inference_worker import InferenceWorker
-from furniture_cutout.settings import SettingsDialog, resolve_cpu_threads
+from furniture_cutout.settings import SettingsDialog
 
 
 class MainWindow(QMainWindow):
@@ -71,8 +67,6 @@ class MainWindow(QMainWindow):
         self._right_view = ImageView()
 
         # Background toggle buttons
-        bg_layout = QHBoxLayout()
-        layouts = QVBoxLayout()
 
         # ... (background buttons attached to right_view via toolbar instead)
 

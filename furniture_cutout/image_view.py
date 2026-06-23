@@ -1,190 +1,186 @@
-"""ImageView: left/right image display with zoom, pan, and background modes."""
+"""ImageView widget for left/right image display with zoom, pan, and background."""
 
 from __future__ import annotations
 
-from PIL import Image as PILImage
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtGui import QColor, QImage, QMouseEvent, QPaintEvent, QPainter, QWheelEvent
+from PySide6.QtGui import QImage, QPainter, QWheelEvent, QMouseEvent
 from PySide6.QtWidgets import QWidget
+
+from PIL import Image
 
 from furniture_cutout import image_processing as ip
 
 
 class ImageView(QWidget):
-    """Widget to display an image with zoom/pan support.
+    """A zoomable/pannable image display widget.
 
-    Provides view_to_image() coordinate conversion for box selection.
+    Supports checkerboard/white/black background modes and view→image
+    coordinate conversion that stays accurate after zoom and pan.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self._image: QImage | None = None
-        self._result_image: QImage | None = None
-        self._scale = 1.0
-        self._offset = QPoint(0, 0)
-        self._bg_mode = "checker"
-        self._image_size = (0, 0)  # original pixels
-        self._dragging = False
-        self._drag_start = QPoint()
-        self._drag_offset_start = QPoint()
-        # Overlay rectangle (for box selection preview)
-        self._overlay_rect: tuple[int, int, int, int] | None = None
-        self.setMinimumSize(200, 200)
+        self._image: QImage | None = None          # displayed image (original or result)
+        self._scale: float = 1.0                    # current zoom factor
+        self._offset: QPoint = QPoint(0, 0)         # pan offset in view pixels
+        self._bg_mode: str = "checker"              # "checker" | "white" | "black"
+        self._dragging: bool = False
+        self._drag_start: QPoint = QPoint(0, 0)
+        self._image_size: tuple[int, int] = (0, 0)  # original image (w, h)
+        self._bg_image: QImage | None = None        # cached background for current size
+        self.setMinimumSize(100, 100)
         self.setMouseTracking(False)
 
-    def set_original(self, pil_img: PILImage.Image) -> None:
-        """Set the original image (left panel)."""
-        self._image = ip.qimage_from_pil(pil_img.convert("RGB"))
+    # ---- Public API --------------------------------------------------------
+
+    def set_original(self, pil_img) -> None:
+        """Set the original image (left view)."""
+        self._image = ip.qimage_from_pil(pil_img)
         self._image_size = (pil_img.width, pil_img.height)
+        self._scale = 1.0
         self._offset = QPoint(0, 0)
-        self._fit_to_widget()
+        # Rebuild background for the new image size
+        self._rebuild_bg()
         self.update()
 
-    def set_result(self, rgba_pil: PILImage.Image) -> None:
-        """Set the result RGBA image (right panel)."""
-        self._result_image = ip.qimage_from_pil(rgba_pil)
+    def set_result(self, rgba_pil) -> None:
+        """Set the result image (right view, transparent background)."""
+        self._image = ip.qimage_from_pil(rgba_pil)
+        self._image_size = (rgba_pil.width, rgba_pil.height)
+        self._scale = 1.0
+        self._offset = QPoint(0, 0)
+        self._rebuild_bg()
         self.update()
 
     def set_background(self, mode: str) -> None:
-        """Set background display mode: checker, white, black."""
+        """Change background display mode.
+
+        Args:
+            mode: One of "checker", "white", "black".
+        """
+        if mode not in ("checker", "white", "black"):
+            raise ValueError(f"Unknown background mode: {mode}")
         self._bg_mode = mode
+        self._rebuild_bg()
         self.update()
 
-    def set_overlay_rect(self, rect: tuple[int, int, int, int] | None) -> None:
-        """Set an overlay rectangle in view coordinates (x, y, w, h)."""
-        self._overlay_rect = rect
-        self.update()
+    def view_to_image(self, pos: QPoint) -> QPoint:
+        """Convert viewport coordinates to original image coordinates.
 
-    def clear(self) -> None:
-        """Clear all images."""
-        self._image = None
-        self._result_image = None
-        self._overlay_rect = None
-        self._image_size = (0, 0)
-        self._scale = 1.0
-        self._offset = QPoint(0, 0)
-        self.update()
+        This is the critical coordinate conversion: must stay accurate
+        after zoom and pan. Formula: (view - offset) / scale.
+        Returns QPoint in image pixel space.
+        """
+        x = round((pos.x() - self._offset.x()) / self._scale)
+        y = round((pos.y() - self._offset.y()) / self._scale)
+        return QPoint(x, y)
 
-    def view_to_image(self, view_pos: QPoint) -> QPoint:
-        """Convert view coordinates to original image coordinates."""
-        img_x = int((view_pos.x() - self._offset.x()) / self._scale)
-        img_y = int((view_pos.y() - self._offset.y()) / self._scale)
-        return QPoint(max(0, img_x), max(0, img_y))
+    # ---- Internal helpers --------------------------------------------------
 
-    def _fit_to_widget(self) -> None:
-        """Initial fit: scale image to fit widget."""
-        if not self._image or self._image_size == (0, 0):
-            return
-        w_scale = self.width() / self._image_size[0] if self._image_size[0] > 0 else 1
-        h_scale = self.height() / self._image_size[1] if self._image_size[1] > 0 else 1
-        self._scale = min(w_scale, h_scale) * 0.9  # leave a small margin
-        # Center
-        disp_w = self._image_size[0] * self._scale
-        disp_h = self._image_size[1] * self._scale
-        self._offset = QPoint(
-            int((self.width() - disp_w) / 2),
-            int((self.height() - disp_h) / 2),
-        )
+    def _rebuild_bg(self) -> None:
+        """Regenerate the background image for the current widget size + mode."""
+        w = max(1, self.width())
+        h = max(1, self.height())
+        if self._bg_mode == "checker":
+            self._bg_image = ip.checkerboard(w, h)
+        elif self._bg_mode == "white":
+            pil = Image.new("RGB", (w, h), (255, 255, 255))
+            self._bg_image = ip.qimage_from_pil(pil)
+        elif self._bg_mode == "black":
+            pil = Image.new("RGB", (w, h), (0, 0, 0))
+            self._bg_image = ip.qimage_from_pil(pil)
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def _clamp_offset(self) -> None:
+        """Prevent panning too far (optional clamp, keep image reachable)."""
+        # No hard clamp — user can pan freely; the image stays visible
+        pass
+
+    # ---- Qt event overrides -----------------------------------------------
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        """Draw background then image."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
         # Background
-        self._draw_background(painter)
+        if self._bg_image is None or self._bg_image.size() != self.size():
+            self._rebuild_bg()
+        if self._bg_image is not None:
+            painter.drawImage(0, 0, self._bg_image)
 
-        # Image
-        qimg = self._result_image if self._result_image else self._image
-        if qimg:
-            scaled = qimg.scaled(
-                int(self._image_size[0] * self._scale),
-                int(self._image_size[1] * self._scale),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            painter.drawImage(self._offset, scaled)
+        # Image — draw at (offset) scaled by _scale
+        if self._image is not None:
+            iw, ih = self._image_size
+            if iw > 0 and ih > 0:
+                ox = self._offset.x()
+                oy = self._offset.y()
+                painter.save()
+                painter.translate(ox, oy)
+                painter.scale(self._scale, self._scale)
+                painter.drawImage(0, 0, self._image, 0, 0, iw, ih)
+                painter.restore()
 
-        # Overlay rectangle
-        if self._overlay_rect:
-            x, y, w, h = self._overlay_rect
-            painter.setPen(QColor(255, 0, 0, 200))
-            painter.setBrush(QColor(255, 0, 0, 30))
-            painter.drawRect(x, y, w, h)
+        painter.end()
 
-    def _draw_background(self, painter: QPainter) -> None:
-        if self._bg_mode == "white":
-            painter.fillRect(self.rect(), Qt.GlobalColor.white)
-        elif self._bg_mode == "black":
-            painter.fillRect(self.rect(), Qt.GlobalColor.black)
-        else:  # checker
-            if self._image:
-                checker = ip.checkerboard(self.width(), self.height(), 16)
-                painter.drawImage(0, 0, checker)
-            else:
-                painter.fillRect(self.rect(), Qt.GlobalColor.white)
-
-    def wheelEvent(self, event: QWheelEvent) -> None:
-        """Zoom in/out around mouse position."""
-        if not self._image:
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802
+        """Zoom in/out centered on mouse cursor."""
+        if self._image is None:
             return
-        # Mouse position before zoom
-        old_pos = event.position().toPoint()
-        old_img = self.view_to_image(old_pos)
 
-        # Zoom factor
+        # Determine zoom direction
         delta = event.angleDelta().y()
-        factor = 1.1 if delta > 0 else 1 / 1.1
+        if delta == 0:
+            return
+        factor = 1.1 if delta > 0 else 1.0 / 1.1
+
+        # Mouse position in viewport
+        mouse_pos = event.position().toPoint()
+
+        # Current mouse position in image coordinates
+        img_before = self.view_to_image(mouse_pos)
+
+        # Apply zoom
         new_scale = self._scale * factor
         new_scale = max(0.1, min(8.0, new_scale))
-        self._scale = new_scale
 
-        # Adjust offset so mouse position stays on the same image point
-        self._offset = QPoint(
-            int(old_pos.x() - old_img.x() * self._scale),
-            int(old_pos.y() - old_img.y() * self._scale),
-        )
+        # Adjust offset so image point under cursor stays fixed
+        # img_before = (mouse - offset) / scale
+        # offset_new = mouse - img_before * new_scale
+        ox = round(mouse_pos.x() - img_before.x() * new_scale)
+        oy = round(mouse_pos.y() - img_before.y() * new_scale)
+
+        self._scale = new_scale
+        self._offset = QPoint(ox, oy)
         self.update()
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.MiddleButton:
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        """Start panning on middle button or left button (left=pan unless BoxSelector is active)."""
+        if event.button() == Qt.MiddleButton:
             self._dragging = True
             self._drag_start = event.position().toPoint()
-            self._drag_offset_start = QPoint(self._offset)
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.setCursor(Qt.ClosedHandCursor)
 
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        """Pan while dragging."""
         if self._dragging:
-            delta = event.position().toPoint() - self._drag_start
-            self._offset = self._drag_offset_start + delta
+            pos = event.position().toPoint()
+            dx = pos.x() - self._drag_start.x()
+            dy = pos.y() - self._drag_start.y()
+            self._offset = QPoint(
+                self._offset.x() + dx,
+                self._offset.y() + dy,
+            )
+            self._drag_start = pos
             self.update()
 
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.MiddleButton and self._dragging:
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:  # noqa: N802
+        """End panning."""
+        if event.button() == Qt.MiddleButton and self._dragging:
             self._dragging = False
-            self.setCursor(Qt.CursorShape.ArrowCursor)
+            self.setCursor(Qt.ArrowCursor)
 
-    def resizeEvent(self, event) -> None:
-        if self._image and self._scale > 0:
-            # Keep current zoom, just re-center if needed
-            pass
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        """Rebuild background on resize."""
+        self._rebuild_bg()
         self.update()
-
-    @property
-    def image_size(self) -> tuple[int, int]:
-        return self._image_size
-
-    @property
-    def current_scale(self) -> float:
-        return self._scale
-
-    @property
-    def current_offset(self) -> QPoint:
-        return self._offset
-
-    @property
-    def has_image(self) -> bool:
-        return self._image is not None
-
-    def clear_result(self) -> None:
-        self._result_image = None
-        self.update()
+        super().resizeEvent(event)

@@ -33,7 +33,12 @@ def main() -> int:
     def excepthook(typ, val, tb):
         log_exception(val, context="Unhandled exception")
         msg = "".join(traceback.format_exception(typ, val, tb))
-        QMessageBox.critical(None, "未处理的异常", f"程序遇到意外错误，详情见 logs/app.log。\n\n{msg}")
+        msg_short = msg[:200]
+        QMessageBox.critical(
+            None,
+            "未处理的异常",
+            f"程序遇到意外错误，详情见 logs/app.log。\n{msg_short}",
+        )
 
     sys.excepthook = excepthook
 
@@ -45,5 +50,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except Exception as e:
         log_exception(e, context="Fatal startup error")
-        QMessageBox.critical(None, "启动失败", f"程序启动失败，请联系开发者。详情见 logs/app.log。\n{e}")
+        msg_e = str(e)[:200]
+        QMessageBox.critical(None, "启动失败", f"启动失败，详情见logs/app.log。\n{msg_e}")
         sys.exit(1)

@@ -1,8 +1,5 @@
 """Tests for box coordinate handling."""
 
-import pytest
-from PIL import Image
-
 from furniture_cutout import image_processing as ip
 
 

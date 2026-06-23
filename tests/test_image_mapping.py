@@ -1,7 +1,6 @@
 """Tests for image mapping: letterbox, unletterbox, expand_box, map_roi_alpha_to_full."""
 
 import numpy as np
-import pytest
 from PIL import Image
 
 from furniture_cutout import image_processing as ip
