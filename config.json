@@ -1,0 +1,10 @@
+{
+  "model_id": "ZhengPeng7/BiRefNet_HR-matting",
+  "model_cache_dir": "",
+  "box_pad_ratio": 0.05,
+  "cpu_threads": "auto",
+  "output_dir": "",
+  "save_alpha": false,
+  "auto_cutout_on_open": false,
+  "hf_mirror": true
+}

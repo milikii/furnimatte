@@ -16,6 +16,13 @@ logs/*.log.*
 # Model cache
 model_cache/
 
+# Model cache
+models/
+
+# Test cache
+.pytest_cache/
+.ruff_cache/
+
 # OS
 .DS_Store
 Thumbs.db
