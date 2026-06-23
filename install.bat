@@ -7,7 +7,7 @@ echo  Furniture Cutout - Install Dependencies
 echo ========================================
 echo.
 
-REM ---- 检查 Python ----
+REM ---- Check Python ----
 where python >nul 2>&1
 if errorlevel 1 goto :no_python
 
@@ -22,17 +22,18 @@ if errorlevel 1 goto :wrong_arch
 
 echo [OK] Python 3.11/3.12 64-bit
 echo.
+goto :python_ok
 
 :no_python
 echo [ERROR] python not found in PATH.
-echo Install Python 3.11 64-bit and check "Add Python to PATH".
+echo Install Python 3.11 or 3.12 64-bit and check "Add Python to PATH".
 echo https://www.python.org/downloads/release/python-3119/
 goto :error
 
 :wrong_version
 echo [ERROR] Need Python 3.11 or 3.12, got !PYVER!.
 echo torch 2.3.1 has no wheel for this version.
-echo Install Python 3.11 64-bit:
+echo Install Python 3.11 or 3.12 64-bit:
 echo https://www.python.org/downloads/release/python-3119/
 goto :error
 
@@ -40,7 +41,8 @@ goto :error
 echo [ERROR] Need 64-bit Python, current is 32-bit.
 goto :error
 
-REM ---- 创建虚拟环境 ----
+:python_ok
+REM ---- Create venv ----
 if exist .venv\ (
     echo [SKIP] .venv already exists
 ) else (
@@ -54,7 +56,7 @@ if exist .venv\ (
 )
 echo.
 
-REM ---- 激活虚拟环境 ----
+REM ---- Activate venv ----
 call .venv\Scripts\activate.bat
 if errorlevel 1 (
     echo [ERROR] venv activation failed
@@ -68,7 +70,7 @@ if errorlevel 1 (
 )
 echo.
 
-REM ---- 安装 CPU 版 PyTorch（不装 CUDA）----
+REM ---- Install CPU PyTorch (no CUDA) ----
 echo [STEP] Installing PyTorch 2.3.1 CPU ...
 echo (~200MB, please wait)
 pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
@@ -79,7 +81,7 @@ if errorlevel 1 (
 )
 echo.
 
-REM ---- 安装其余依赖 ----
+REM ---- Install requirements ----
 echo [STEP] Installing requirements.txt ...
 pip install -r requirements.txt
 if errorlevel 1 (
