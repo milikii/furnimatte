@@ -35,7 +35,7 @@ def make_preview(rgb_pil: Image.Image, max_side: int = 1024) -> Image.Image:
 
 
 def letterbox(
-    img_pil: Image.Image, target: int = 2048, pad_value: tuple[int, int, int] = (114, 114, 114)
+    img_pil: Image.Image, target: int = 1024, pad_value: tuple[int, int, int] = (114, 114, 114)
 ) -> tuple[Image.Image, float, int, int]:
     """Resize keeping aspect ratio so longest side = target, pad short side to square.
 
@@ -204,11 +204,19 @@ def qimage_from_pil(pil_img: Image.Image) -> QImage:
 
 
 def checkerboard(w: int, h: int, cell: int = 16) -> QImage:
-    """Generate checkerboard background QImage."""
-    qimg = QImage(w, h, QImage.Format.Format_RGB32)
-    for y in range(h):
-        for x in range(w):
-            is_white = ((x // cell) + (y // cell)) % 2 == 0
-            color = 0xFFFFFFFF if is_white else 0xFF808080
-            qimg.setPixel(x, y, color)
-    return qimg
+    """Generate checkerboard background QImage using numpy for speed."""
+    # Cell-level pattern
+    cw = max(1, (w + cell - 1) // cell)
+    ch = max(1, (h + cell - 1) // cell)
+    pattern = np.fromfunction(
+        lambda i, j: ((i + j) % 2 == 0).astype(np.uint8),
+        (ch, cw),
+    )
+    # Expand cells to pixels
+    full = np.kron(pattern, np.ones((cell, cell), dtype=np.uint8))
+    full = full[:h, :w]
+    # Convert to RGB: 255=white, 128=gray
+    gray = np.where(full, 255, 128).astype(np.uint8)
+    rgb = np.stack([gray, gray, gray], axis=-1)
+    pil = Image.fromarray(rgb, mode="RGB")
+    return qimage_from_pil(pil)

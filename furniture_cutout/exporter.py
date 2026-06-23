@@ -39,8 +39,6 @@ def save(
     else:
         out_base = src_path.parent
 
-    out_base.mkdir(parents=True, exist_ok=True)
-
     stem = src_path.stem
     out_name = f"{stem}_cutout.png"
     out_path = out_base / out_name
@@ -57,6 +55,7 @@ def save(
         counter += 1
 
     try:
+        out_base.mkdir(parents=True, exist_ok=True)
         rgba_pil.save(str(out_path), format="PNG")
     except (OSError, PermissionError) as e:
         raise ExporterError(f"保存失败：{e}") from e
@@ -82,8 +81,6 @@ def save_alpha(
         out_base = Path(out_dir)
     else:
         out_base = src_path.parent
-    out_base.mkdir(parents=True, exist_ok=True)
-
     stem = src_path.stem
     out_name = f"{stem}_alpha.png"
     out_path = out_base / out_name
@@ -96,6 +93,7 @@ def save_alpha(
 
     alpha_u8 = (np.clip(alpha_np, 0, 1) * 255).astype(np.uint8)
     try:
+        out_base.mkdir(parents=True, exist_ok=True)
         Image.fromarray(alpha_u8, mode="L").save(str(out_path), format="PNG")
     except (OSError, PermissionError) as e:
         raise ExporterError(f"保存 Alpha 蒙版失败：{e}") from e

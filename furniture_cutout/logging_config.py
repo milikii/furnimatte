@@ -33,6 +33,10 @@ def setup_logging(log_dir: str = "logs") -> logging.Logger:
 
 
 def log_exception(exc: BaseException, context: str = "") -> None:
+    """Log a full traceback for *exc* to the app.log file."""
     logger = logging.getLogger()
-    msg = (context + "\n" + traceback.format_exc()) if context else traceback.format_exc()
+    tb_lines = traceback.format_exception(type(exc), exc, exc.__traceback__)
+    msg = "".join(tb_lines)
+    if context:
+        msg = context + "\n" + msg
     logger.error(msg)
