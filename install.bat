@@ -64,7 +64,7 @@ if errorlevel 1 (
 )
 
 echo [STEP] Upgrading pip ...
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
 if errorlevel 1 (
     echo [WARN] pip upgrade failed, continuing ...
 )
@@ -73,7 +73,7 @@ echo.
 REM ---- Install CPU PyTorch (no CUDA) ----
 echo [STEP] Installing PyTorch 2.3.1 CPU ...
 echo (~200MB, please wait)
-echo Trying Tsinghua mirror first (faster in China) ...
+echo Using Tsinghua mirror ...
 pip install torch==2.3.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
 if errorlevel 1 (
     echo [WARN] Tsinghua mirror failed, trying official PyTorch CPU index ...
@@ -88,7 +88,7 @@ echo.
 
 REM ---- Install requirements ----
 echo [STEP] Installing requirements.txt ...
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 if errorlevel 1 (
     echo [ERROR] requirements install failed
     goto :error
