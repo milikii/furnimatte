@@ -70,14 +70,14 @@ if errorlevel 1 (
 )
 echo.
 
-REM ---- Install CPU PyTorch (no CUDA) ----
-echo [STEP] Installing PyTorch 2.3.1 CPU ...
-echo (~200MB, please wait)
-echo Using Tsinghua mirror ...
-pip install torch==2.3.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
+REM ---- Install CPU PyTorch + torchvision (no CUDA) ----
+echo [STEP] Installing PyTorch 2.3.1 + torchvision 0.18.1 CPU ...
+echo (~250MB, please wait)
+echo Using Tsinghua mirror for torchvision (CPU wheel) ...
+pip install torch==2.3.1 torchvision==0.18.1 -i https://pypi.tuna.tsinghua.edu.cn/simple
 if errorlevel 1 (
     echo [WARN] Tsinghua mirror failed, trying official PyTorch CPU index ...
-    pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+    pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu
     if errorlevel 1 (
         echo [ERROR] PyTorch install failed
         echo Network issue? Try a mirror or proxy.
