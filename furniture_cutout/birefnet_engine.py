@@ -79,7 +79,8 @@ class BiRefNetEngine:
         # Set torch thread count before any model ops
         if self.num_threads is not None and self.num_threads > 0:
             torch.set_num_threads(self.num_threads)
-        torch.set_num_interop_threads(1)
+        # NOTE: set_num_interop_threads cannot be called after torch parallel
+        # work has started (it starts at import). Omit it to avoid the error.
 
         try:
             from transformers import AutoModelForImageSegmentation
