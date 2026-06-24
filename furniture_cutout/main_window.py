@@ -182,11 +182,11 @@ class MainWindow(QMainWindow):
         if self._busy or not self.original_rgb:
             return
         self._set_busy(True)
-        self._status.showMessage("正在加载模型…")
+        self._status.showMessage("正在加载模型…" if not self._model_loaded else "正在推理…")
 
-        if not self._model_loaded and not self._model_loading:
-            self._model_loading = True
-            self._worker.request_load()
+        # _do_infer_full calls _ensure_loaded() internally, so we never need
+        # a separate request_load(); that only races request_infer_full and
+        # causes the inference task to be silently dropped (isRunning() guard).
         self._worker.request_infer_full(self.original_rgb)
 
     def enter_box_mode(self):
