@@ -46,12 +46,14 @@ class BiRefNetEngine:
         cache_dir: str | None = None,
         num_threads: int | None = None,
         progress_cb=None,
+        hf_mirror: bool = False,
     ) -> None:
         """Store config; do NOT load model (lazy loading via load())."""
         self.model_id = model_id
         self.cache_dir = cache_dir
         self.num_threads = num_threads
         self.progress_cb = progress_cb
+        self.hf_mirror = hf_mirror
         self.model = None
 
     @property
@@ -65,6 +67,12 @@ class BiRefNetEngine:
         """
         if self.is_loaded:
             return
+
+        # Route HuggingFace requests through hf-mirror.com (China-friendly)
+        # Must be set before huggingface_hub / transformers import.
+        import os
+        if self.hf_mirror:
+            os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
         # Set torch thread count before any model ops
         if self.num_threads is not None and self.num_threads > 0:

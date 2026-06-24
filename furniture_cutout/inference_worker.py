@@ -83,6 +83,7 @@ class InferenceWorker(QThread):
             model_id=self.settings.model_id,
             cache_dir=cache_dir,
             num_threads=num_threads,
+            hf_mirror=self.settings.hf_mirror,
         )
         eng.load()
         self._engine = eng
@@ -144,6 +145,7 @@ class InferenceWorker(QThread):
             model_id=self.settings.model_id,
             cache_dir=cache_dir,
             num_threads=num_threads,
+            hf_mirror=self.settings.hf_mirror,
         )
         eng.load()
         self._engine = eng
