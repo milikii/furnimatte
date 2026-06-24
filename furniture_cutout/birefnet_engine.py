@@ -63,6 +63,8 @@ class BiRefNetEngine:
     def load(self) -> None:
         """Load the model from HuggingFace or local cache.
 
+        Uses snapshot_download first (so we can report download progress),
+        then loads from the local snapshot directory.
         Raises EngineError on failure (network, disk, model compatibility).
         """
         if self.is_loaded:
@@ -87,11 +89,23 @@ class BiRefNetEngine:
                 "transformers not installed. pip install transformers",
             ) from exc
 
+        # Files BiRefNet trust_remote_code needs from the repo
+        needed = [
+            "config.json",
+            "birefnet.py",
+            "BiRefNet_config.py",
+            "model.safetensors",
+            "handler.py",
+        ]
+
+        local_dir = self._download_with_progress(needed)
+
         try:
             model = AutoModelForImageSegmentation.from_pretrained(
-                self.model_id,
+                local_dir,
                 trust_remote_code=True,
-                cache_dir=self.cache_dir,
+                use_safetensors=True,
+                local_files_only=True,
             )
         except Exception as exc:
             msg = str(exc)
@@ -104,6 +118,98 @@ class BiRefNetEngine:
         model.to(torch.device("cpu"))
         model.eval()
         self.model = model
+
+    def _download_with_progress(self, needed: list[str]) -> str:
+        """Download model files via snapshot_download, reporting progress.
+
+        Returns the local snapshot directory path.
+        """
+        import os
+        import threading
+        import time as _time
+
+        from huggingface_hub import snapshot_download, HfApi
+
+        endpoint = os.environ.get("HF_ENDPOINT")
+        api = HfApi(endpoint=endpoint)
+
+        # Query total size of needed files
+        total_bytes = 0
+        try:
+            info = api.model_info(self.model_id)
+            for s in info.siblings:
+                if s.rfilename in needed and s.size is not None:
+                    total_bytes += s.size
+        except Exception:
+            pass  # unknown total -> progress shows downloaded only
+
+        cache_dir = self.cache_dir
+        # Determine the repo cache root to monitor for size growth
+        if cache_dir:
+            repo_cache_root = os.path.join(
+                cache_dir,
+                "models--" + self.model_id.replace("/", "--"),
+            )
+        else:
+            from huggingface_hub.constants import HF_HUB_CACHE
+            repo_cache_root = os.path.join(
+                HF_HUB_CACHE,
+                "models--" + self.model_id.replace("/", "--"),
+            )
+
+        stop = threading.Event()
+
+        def _dir_size(path: str) -> int:
+            total = 0
+            if not os.path.isdir(path):
+                return 0
+            for root, _dirs, files in os.walk(path):
+                for f in files:
+                    try:
+                        total += os.path.getsize(os.path.join(root, f))
+                    except OSError:
+                        pass
+            return total
+
+        def _monitor():
+            last_bytes = 0
+            last_time = _time.time()
+            while not stop.is_set():
+                cur = _dir_size(repo_cache_root)
+                now = _time.time()
+                dt = max(now - last_time, 0.1)
+                speed = (cur - last_bytes) / dt
+                if self.progress_cb:
+                    self.progress_cb(cur, total_bytes, speed)
+                last_bytes = cur
+                last_time = now
+                stop.wait(0.5)
+
+        mon = threading.Thread(target=_monitor, daemon=True)
+        mon.start()
+
+        try:
+            local_dir = snapshot_download(
+                repo_id=self.model_id,
+                cache_dir=self.cache_dir,
+                allow_patterns=needed,
+                endpoint=endpoint,
+            )
+        except Exception as exc:
+            stop.set()
+            msg = str(exc)
+            if "connection" in msg.lower() or "timeout" in msg.lower() or "network" in msg.lower():
+                kind = "download"
+            else:
+                kind = "download"
+            raise EngineError(kind, f"Failed to download model: {msg}") from exc
+        finally:
+            stop.set()
+
+        # Final progress report at 100%
+        if self.progress_cb:
+            self.progress_cb(total_bytes, total_bytes, 0.0)
+        return local_dir
 
     def infer(self, rgb_pil: Image.Image) -> np.ndarray:
         """Run BiRefNet inference, return continuous alpha mask.

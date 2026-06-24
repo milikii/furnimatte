@@ -84,6 +84,7 @@ class InferenceWorker(QThread):
             cache_dir=cache_dir,
             num_threads=num_threads,
             hf_mirror=self.settings.hf_mirror,
+            progress_cb=self._on_download_progress,
         )
         eng.load()
         self._engine = eng
@@ -146,7 +147,16 @@ class InferenceWorker(QThread):
             cache_dir=cache_dir,
             num_threads=num_threads,
             hf_mirror=self.settings.hf_mirror,
+            progress_cb=self._on_download_progress,
         )
         eng.load()
         self._engine = eng
         self.status.emit("模型就绪 ✓")
+
+    def _on_download_progress(self, cur: int, total: int, speed: float) -> None:
+        """Report model download progress to the GUI.
+
+        Emits a progress signal with pipe-delimited format:
+            download|<cur_bytes>|<total_bytes>|<speed_bps>
+        """
+        self.progress.emit(f"download|{int(cur)}|{int(total)}|{speed:.1f}")

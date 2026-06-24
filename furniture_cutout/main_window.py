@@ -287,8 +287,32 @@ class MainWindow(QMainWindow):
         if "就绪" in msg:
             self._model_loaded = True
             self._model_loading = False
+            self._progress.hide()
 
     def _on_worker_progress(self, msg: str):
+        # Format: download|<cur_bytes>|<total_bytes>|<speed_bps>
+        if msg.startswith("download|"):
+            parts = msg.split("|")
+            if len(parts) == 4:
+                cur = int(parts[1])
+                total = int(parts[2])
+                speed = float(parts[3])
+                if total > 0:
+                    pct = min(100, int(cur * 100 / total))
+                    self._progress.setRange(0, 100)
+                    self._progress.setValue(pct)
+                    self._progress.show()
+                    self._status.showMessage(
+                        f"下载模型  {cur / 1e6:.1f}/{total / 1e6:.1f} MB  "
+                        f"{speed / 1e6:.2f} MB/s"
+                    )
+                else:
+                    self._progress.setRange(0, 0)
+                    self._progress.show()
+                    self._status.showMessage(
+                        f"下载模型  {cur / 1e6:.1f} MB  {speed / 1e6:.2f} MB/s"
+                    )
+                return
         self._status.showMessage(msg)
 
     def _on_worker_finished(self, result: dict):
