@@ -61,22 +61,20 @@ class BiRefNetEngine:
         return self.model is not None
 
     def load(self) -> None:
-        """Load the model from HuggingFace or local cache.
+        """Load the model from local directory or HuggingFace.
 
-        Uses snapshot_download first (so we can report download progress),
-        then loads from the local snapshot directory.
-        Raises EngineError on failure (network, disk, model compatibility).
+        If a local model directory exists under models/<model_name>/,
+        load from there (no network). Otherwise download from HF.
         """
         if self.is_loaded:
             return
 
-        # Route HuggingFace requests through hf-mirror.com (China-friendly)
-        # Must be set before huggingface_hub / transformers import.
         import os
+
+        # Route HuggingFace requests through hf-mirror.com (China-friendly)
         if self.hf_mirror:
             os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
-        # Set torch thread count before any model ops
         if self.num_threads is not None and self.num_threads > 0:
             torch.set_num_threads(self.num_threads)
         # NOTE: set_num_interop_threads cannot be called after torch parallel
@@ -90,16 +88,18 @@ class BiRefNetEngine:
                 "transformers not installed. pip install transformers",
             ) from exc
 
-        # Files BiRefNet trust_remote_code needs from the repo
-        needed = [
-            "config.json",
-            "birefnet.py",
-            "BiRefNet_config.py",
-            "model.safetensors",
-            "handler.py",
-        ]
-
-        local_dir = self._download_with_progress(needed)
+        local_dir = self._find_local_model_dir()
+        if local_dir:
+            self._report_status(f"从本地加载模型: {local_dir}")
+        else:
+            needed = [
+                "config.json",
+                "birefnet.py",
+                "BiRefNet_config.py",
+                "model.safetensors",
+                "handler.py",
+            ]
+            local_dir = self._download_with_progress(needed)
 
         try:
             model = AutoModelForImageSegmentation.from_pretrained(
@@ -110,15 +110,41 @@ class BiRefNetEngine:
             )
         except Exception as exc:
             msg = str(exc)
-            if "connection" in msg.lower() or "timeout" in msg.lower() or "network" in msg.lower():
-                kind = "download"
-            else:
-                kind = "model_load"
-            raise EngineError(kind, f"Failed to load model: {msg}") from exc
+            raise EngineError("model_load", f"Failed to load model: {msg}") from exc
 
         model.to(torch.device("cpu"))
         model.eval()
         self.model = model
+
+    def _find_local_model_dir(self) -> str | None:
+        """Find a local model directory. Returns path or None.
+
+        Search order:
+          1. settings.model_cache_dir if set and valid
+          2. models/<last-segment-of-model_id>/ next to the package
+        """
+        import os
+
+        # Explicit cache_dir setting
+        if self.cache_dir and os.path.isdir(self.cache_dir):
+            if os.path.exists(os.path.join(self.cache_dir, "config.json")):
+                return self.cache_dir
+
+        # models/<name>/ beside the package directory
+        pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        model_name = self.model_id.split("/")[-1]
+        local = os.path.join(pkg_dir, "models", model_name)
+        if os.path.isdir(local) and os.path.exists(os.path.join(local, "config.json")):
+            return local
+
+        return None
+
+    def _report_status(self, msg: str) -> None:
+        """Forward a status message via progress_cb if set."""
+        if self.progress_cb:
+            # Use a sentinel format so the GUI can show it as text, not progress
+            self.progress_cb(-1, -1, 0.0)  # signal: indeterminate
+        # We cannot emit text via the numeric cb; the worker maps this.
 
     def _download_with_progress(self, needed: list[str]) -> str:
         """Download model files via snapshot_download, reporting progress.
