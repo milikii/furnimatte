@@ -334,6 +334,7 @@ class MainWindow(QMainWindow):
     def _on_worker_failed(self, kind: str, message: str, tb: str):
         self._set_busy(False)
         self._model_loading = False
+        self._progress.hide()
         titles = {
             "model_load": "模型加载失败",
             "download": "模型下载失败",
@@ -342,19 +343,22 @@ class MainWindow(QMainWindow):
             "inference": "推理失败",
             "save": "保存失败",
         }
-        title = titles.get(kind, "错误")
+        title = str(titles.get(kind, "错误"))
+        message = str(message)
         if kind == "download":
-            QMessageBox.critical(
-                self,
-                title,
-                (
-                    "无法下载模型。请检查网络、代理，\n"
-                    "或在设置中开启 HF 镜像、\n"
-                    f"或手动选择本地模型目录。\n\n{message}",
-                ),
+            text = (
+                "无法下载模型。请检查网络、代理，\n"
+                "或在设置中开启 HF 镜像、\n"
+                f"或手动选择本地模型目录。\n\n{message}"
             )
         else:
-            QMessageBox.critical(self, title, f"{message}\n\n详情见 logs/app.log")
+            text = f"{message}\n\n详情见 logs/app.log"
+        try:
+            QMessageBox.critical(self, title, text)
+        except Exception:
+            # Fallback: print to stderr so the error is never lost
+            import sys as _sys
+            print(f"[{title}] {text}", file=_sys.stderr)
         logging_config.log_exception(Exception(message), context=f"[{kind}]")
 
     # --- Busy state ---
