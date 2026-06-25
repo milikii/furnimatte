@@ -54,7 +54,6 @@ class MainWindow(QMainWindow):
         self._worker = InferenceWorker(self._settings, parent=self)
         self._connect_worker_signals()
         self._model_loaded = False
-        self._model_loading = False
         self._busy = False
 
         # --- Drag-drop ---
@@ -222,9 +221,9 @@ class MainWindow(QMainWindow):
         self._act_box.setChecked(False)
         self._status.showMessage("正在对框选区域重算…")
 
-        if not self._model_loaded and not self._model_loading:
-            self._model_loading = True
-            self._worker.request_load()
+        # request_infer_box() loads the model itself via _ensure_loaded(); a
+        # separate request_load() would race it (isRunning() guard silently
+        # drops the box task) — same bug already fixed for the full path.
         self._worker.request_infer_box(self.original_rgb, (x, y, w, h))
 
     # --- Save ---
@@ -286,7 +285,6 @@ class MainWindow(QMainWindow):
         self._status.showMessage(msg)
         if "就绪" in msg:
             self._model_loaded = True
-            self._model_loading = False
             self._progress.hide()
 
     def _on_worker_progress(self, msg: str):
@@ -333,7 +331,6 @@ class MainWindow(QMainWindow):
 
     def _on_worker_failed(self, kind: str, message: str, tb: str):
         self._set_busy(False)
-        self._model_loading = False
         self._progress.hide()
         titles = {
             "model_load": "模型加载失败",

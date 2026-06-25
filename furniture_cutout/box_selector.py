@@ -61,7 +61,7 @@ class BoxSelector(QObject):
                 self._start_img = self._view.view_to_image(self._start_view)
                 if not self._rubber:
                     self._rubber = QRubberBand(QRubberBand.Rectangle.Shape.Rectangle, self._view)
-                self._rubber.setGeometry(event.position().x(), event.position().y(), 0, 0)
+                self._rubber.setGeometry(self._start_view.x(), self._start_view.y(), 0, 0)
                 self._rubber.show()
                 return True
 

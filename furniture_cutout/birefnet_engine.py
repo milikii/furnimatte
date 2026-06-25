@@ -114,6 +114,9 @@ class BiRefNetEngine:
 
         model.to(torch.device("cpu"))
         model.eval()
+        # Enable TF32 CPU matmul precision once (global setting; no need to
+        # re-set it on every inference call).
+        torch.set_float32_matmul_precision("high")
         self.model = model
 
     def _find_local_model_dir(self) -> str | None:
@@ -224,12 +227,9 @@ class BiRefNetEngine:
             )
         except Exception as exc:
             stop.set()
-            msg = str(exc)
-            if "connection" in msg.lower() or "timeout" in msg.lower() or "network" in msg.lower():
-                kind = "download"
-            else:
-                kind = "download"
-            raise EngineError(kind, f"Failed to download model: {msg}") from exc
+            raise EngineError(
+                "download", f"Failed to download model: {exc}"
+            ) from exc
         finally:
             stop.set()
 
@@ -275,9 +275,6 @@ class BiRefNetEngine:
         mean = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
         std = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
         img_tensor = (img_tensor - mean) / std
-
-        # Enable TF32 CPU matmul precision for modest speedup
-        torch.set_float32_matmul_precision("high")
 
         # === Inference ===
         try:

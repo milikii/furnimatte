@@ -155,6 +155,11 @@ class SettingsDialog(QDialog):
         self._auto_cutout_cb.setChecked(self._settings.auto_cutout_on_open)
         form.addRow(self._auto_cutout_cb)
 
+        # HF 镜像（国内下载加速）
+        self._hf_mirror_cb = QCheckBox("使用 HF 镜像源（hf-mirror.com，国内推荐）")
+        self._hf_mirror_cb.setChecked(self._settings.hf_mirror)
+        form.addRow(self._hf_mirror_cb)
+
         layout.addLayout(form)
 
         # 按钮
@@ -190,7 +195,7 @@ class SettingsDialog(QDialog):
             output_dir=self._out_dir_edit.text().strip(),
             save_alpha=self._save_alpha_cb.isChecked(),
             auto_cutout_on_open=self._auto_cutout_cb.isChecked(),
-            hf_mirror=self._settings.hf_mirror,
+            hf_mirror=self._hf_mirror_cb.isChecked(),
         )
         return s
 

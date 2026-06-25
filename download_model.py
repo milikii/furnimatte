@@ -17,7 +17,9 @@ print("Progress bar below. If it stalls, Ctrl+C and retry,")
 print("or set HF_ENDPOINT=https://huggingface.co with a proxy.")
 print("-" * 60)
 
-from huggingface_hub import snapshot_download
+# Imported here (not at top) so the banner above prints before the slow
+# huggingface_hub import — keeps the console responsive on first run.
+from huggingface_hub import snapshot_download  # noqa: E402
 
 try:
     path = snapshot_download(

@@ -29,6 +29,8 @@ class ImageView(QWidget):
         self._image_size: tuple[int, int] = (0, 0)  # original image (w, h)
         self._bg_image: QImage | None = None        # cached background for current size
         self._overlay_rect = None                    # optional overlay rect (reserved)
+        self._fit_pending: bool = False              # re-fit to viewport on next paint
+        self._user_zoomed: bool = False              # user took manual zoom/pan control
         self.setMinimumSize(100, 100)
         self.setMouseTracking(False)
 
@@ -38,8 +40,7 @@ class ImageView(QWidget):
         """Set the original image (left view)."""
         self._image = ip.qimage_from_pil(pil_img)
         self._image_size = (pil_img.width, pil_img.height)
-        self._scale = 1.0
-        self._offset = QPoint(0, 0)
+        self._request_fit()
         # Rebuild background for the new image size
         self._rebuild_bg()
         self.update()
@@ -48,8 +49,7 @@ class ImageView(QWidget):
         """Set the result image (right view, transparent background)."""
         self._image = ip.qimage_from_pil(rgba_pil)
         self._image_size = (rgba_pil.width, rgba_pil.height)
-        self._scale = 1.0
-        self._offset = QPoint(0, 0)
+        self._request_fit()
         self._rebuild_bg()
         self.update()
 
@@ -72,6 +72,8 @@ class ImageView(QWidget):
         self._bg_image = None
         self._scale = 1.0
         self._offset = QPoint(0, 0)
+        self._fit_pending = False
+        self._user_zoomed = False
         self.update()
 
     def set_overlay_rect(self, rect) -> None:
@@ -114,15 +116,37 @@ class ImageView(QWidget):
             pil = Image.new("RGB", (w, h), (0, 0, 0))
             self._bg_image = ip.qimage_from_pil(pil)
 
-    def _clamp_offset(self) -> None:
-        """Prevent panning too far (optional clamp, keep image reachable)."""
-        # No hard clamp — user can pan freely; the image stays visible
-        pass
+    def _request_fit(self) -> None:
+        """Mark the view to re-fit on the next paint and hand control back to fit."""
+        self._fit_pending = True
+        self._user_zoomed = False
+
+    def _apply_fit(self) -> None:
+        """Center the image in the viewport, scaled down to fit (never upscaled).
+
+        Without this a 4K result would render at 1:1 from the top-left corner,
+        so the user would only see a small crop. Fit-to-window shows the whole
+        image; manual zoom/pan afterwards disables auto-fit.
+        """
+        iw, ih = self._image_size
+        vw, vh = self.width(), self.height()
+        if iw <= 0 or ih <= 0 or vw <= 1 or vh <= 1:
+            return  # viewport not laid out yet; retry on the next paint
+        scale = min(vw / iw, vh / ih, 1.0)
+        self._scale = scale
+        self._offset = QPoint(
+            round((vw - iw * scale) / 2),
+            round((vh - ih * scale) / 2),
+        )
+        self._fit_pending = False
 
     # ---- Qt event overrides -----------------------------------------------
 
     def paintEvent(self, event) -> None:  # noqa: N802
         """Draw background then image."""
+        if self._fit_pending and self._image is not None:
+            self._apply_fit()
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
 
@@ -155,6 +179,7 @@ class ImageView(QWidget):
         delta = event.angleDelta().y()
         if delta == 0:
             return
+        self._user_zoomed = True
         factor = 1.1 if delta > 0 else 1.0 / 1.1
 
         # Mouse position in viewport
@@ -181,6 +206,7 @@ class ImageView(QWidget):
         """Start panning on middle button or left button (left=pan unless BoxSelector is active)."""
         if event.button() == Qt.MiddleButton:
             self._dragging = True
+            self._user_zoomed = True
             self._drag_start = event.position().toPoint()
             self.setCursor(Qt.ClosedHandCursor)
 
@@ -204,7 +230,9 @@ class ImageView(QWidget):
             self.setCursor(Qt.ArrowCursor)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
-        """Rebuild background on resize."""
+        """Rebuild background and re-fit the image (unless the user took control)."""
+        if self._image is not None and not self._user_zoomed:
+            self._fit_pending = True
         self._rebuild_bg()
         self.update()
         super().resizeEvent(event)

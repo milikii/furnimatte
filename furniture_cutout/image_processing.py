@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import io
-
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
@@ -194,13 +192,19 @@ def compose_rgba(rgb_pil: Image.Image, alpha_np: np.ndarray) -> Image.Image:
 
 
 def qimage_from_pil(pil_img: Image.Image) -> QImage:
-    """Convert PIL Image to QImage."""
-    buf = io.BytesIO()
-    pil_img.save(buf, format="PNG")
-    buf.seek(0)
-    data = buf.read()
-    qimg = QImage.fromData(data)
-    return qimg
+    """Convert a PIL Image to a QImage without a PNG round-trip.
+
+    Builds the QImage straight from RGBA pixel bytes (scanline stride 4*w is
+    always 32-bit aligned, so no padding handling is needed). `.copy()` detaches
+    the result from the temporary `data` buffer, which is freed on return —
+    without it the QImage would point at released memory.
+    """
+    if pil_img.mode != "RGBA":
+        pil_img = pil_img.convert("RGBA")
+    w, h = pil_img.size
+    data = pil_img.tobytes("raw", "RGBA")
+    qimg = QImage(data, w, h, 4 * w, QImage.Format.Format_RGBA8888)
+    return qimg.copy()
 
 
 def checkerboard(w: int, h: int, cell: int = 16) -> QImage:
